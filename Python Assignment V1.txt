@@ -1,0 +1,161 @@
+import pandas as pd
+import math
+import itertools
+
+df_train= pd.read_csv('Desktop/IUBH/train.csv')
+#dataframe for 50 ideal functions
+df_ideal= pd.read_csv('Desktop/IUBH/ideal.csv')
+#dataframe for the test function
+df_test = pd.read_csv('Desktop/IUBH/test.csv')
+
+
+class Task1:
+    '''
+     base class of Resultant class which is used to provide foundational calculations on the task
+     
+    '''
+   
+    def __init__(self,train,ideal):
+        self.train = train
+        self.ideal = ideal
+        
+    def __str__(self):
+        return self.ideal
+    
+    def residual(self,lst1,lst2):
+        subtracted = []
+        for item1,item2 in zip(lst1,lst2):
+            subtracted.append(item1-item2)
+        return subtracted
+    
+    def eachList(self,index):
+        if not type(index) is int:
+            raise Exception("Only integers are allowed")     
+        try:
+            Series=df_ideal.iteritems()
+            idealList = []
+            for (columnName,item) in Series:
+                idealList.append(item)
+        except:
+            print('eachList function was not executed: index should be in the range 0-50 inclusive')
+        else:
+            return idealList[index]
+
+#class Resultant inherits from Task1
+class Resultant(Task1):
+    def __init__(self,train,ideal):
+        super().__init__(train,ideal)
+        
+    def isResult(self,lst):
+        '''
+        The criteria for selection of an ideal function is executed in this function and 
+        returns a list of all sum of squares 
+        '''
+        mylist=[]
+        for i in range(len([column_name for column_name in df_ideal])):
+            result = map(lambda x:x*x,self.residual(lst,self.eachList(i)))
+            Sum = int(sum(result))
+            mylist.append(Sum)
+        return(mylist[1:])
+       
+    #return the chosen column name of y values of an ideal function for a given training function passed as an argument
+    def idealFunc(self, lst):
+        '''
+        Returns the column name of the least sum of squares (ideal function) as an index from y1-y50
+        '''
+        finalList=self.isResult(lst)
+        df_r = pd.DataFrame(finalList,
+                            index=[column_name for column_name in df_ideal if column_name!='x'],
+                            columns=['sum_of_squares'])
+        df_r=df_r.rename_axis('column_name')
+        return df_r[['sum_of_squares']].idxmin()
+    
+    #returms the chosen ideal list of y values of  a training function passed as an argument
+    def multiconv(self,lst):
+        '''
+        Returns a list of all the y values of the calculated ideal function 
+        '''
+        multi_ideal=df_ideal[self.idealFunc(lst)].values.tolist()
+        return [ele for sub in multi_ideal for ele in sub]
+    
+class Mapping(Resultant):
+    def __init__(self,train,ideal):
+        super().__init__(train,ideal)
+    
+
+    def checkKey(self,lst):
+        test_dic = {df_test['x'][i]:df_test['y'][i] for i in range(len(df_test['x']))}
+        ideal_dic = {df_train['x'][i]: self.multiconv(lst)[i] for i in range(len(df_train['x']))}
+        critical_point = max(self.residual(lst,self.multiconv(lst)))*math.sqrt(2)
+        mylist=[]
+        for key in ideal_dic:
+            if key in test_dic.keys():
+                myvalue=(abs(test_dic[key]-ideal_dic[key]))
+                if myvalue < critical_point:
+                    mylist.append(key)
+        return mylist 
+    
+    def checkdev(self,lst):
+        test_dic = {df_test['x'][i]:df_test['y'][i] for i in range(len(df_test['x']))}
+        ideal_dic = {df_train['x'][i]: self.multiconv(lst)[i] for i in range(len(df_train['x']))}
+        critical_point = max(self.residual(lst,self.multiconv(lst)))*math.sqrt(2)
+        mylist=[]
+        for key in ideal_dic:
+            if key in test_dic.keys():
+                myvalue=(abs(test_dic[key]-ideal_dic[key]))
+                if myvalue < critical_point:
+                    mylist.append(myvalue)
+        return mylist 
+    
+    def findValue(self,lst):
+        test_dic = {df_test['x'][i]:df_test['y'][i] for i in range(len(df_test['x']))}
+        ideal_dic = {df_train['x'][i]: self.multiconv(lst)[i] for i in range(len(df_train['x']))}
+        critical_point = max(self.residual(lst,self.multiconv(lst)))*math.sqrt(2)
+        
+        myl=[]
+        for k in self.checkKey(lst):
+            myl.append(test_dic[k])
+        return myl
+    
+    def myDataFrame(self,lst1,lst2,lst3,lst4):
+        '''
+        Accepts all 4 training functions by their column name i.e y1.y2,y3,y4 
+        and retains a dataframe of the test points ,deviation and the ideal function for all suitable test points 
+        '''
+        df4=pd.concat([pd.DataFrame({'val1':self.checkKey(lst4),'val2':self.findValue(lst4),'val3':self.checkdev(lst4)}),
+                       pd.DataFrame([list(self.idealFunc(lst4)) for x in self.checkKey(lst4)])],axis=1)
+        df3=pd.concat([pd.DataFrame({'val1':self.checkKey(lst3),'val2':self.findValue(lst3),'val3':self.checkdev(lst3)}),
+                       pd.DataFrame([list(self.idealFunc(lst3)) for x in self.checkKey(lst3)])],axis=1)
+        df2=pd.concat([pd.DataFrame({'val1':self.checkKey(lst2),'val2':self.findValue(lst2),'val3':self.checkdev(lst2)}),
+                       pd.DataFrame([list(self.idealFunc(lst2)) for x in self.checkKey(lst2)])],axis=1)
+        df1=pd.concat([pd.DataFrame({'val1':self.checkKey(lst1),'val2':self.findValue(lst1),'val3':self.checkdev(lst1)}),
+                       pd.DataFrame([list(self.idealFunc(lst1)) for x in self.checkKey(lst1)])],axis=1)
+
+        result = pd.concat([df1,df2,df3,df4])
+        result.columns=['X(test func)','Y(test func)','Delta Y (test func)','No of ideal Func']
+        return result
+
+#Driver code
+if __name__ == "__main__" :
+    '''
+    All four training functions used as inputs in the program to determine their corresponding ideal functions
+    
+    '''
+    y1=list(df_train['y1'])
+    y2=list(df_train['y2'])
+    y3=list(df_train['y3'])
+    y4=list(df_train['y4'])
+
+mapper = Mapping(df_train,df_ideal)
+mapper.myDataFrame(y1,y2,y3,y4) 
+
+from sqlalchemy import create_engine as ce
+mapping_db= ce('sqlite:///Desktop/owen_datasets/mapping.db')
+'''
+Introduces exception code to handle the error if the database has been created already else it creates the database
+'''
+try:
+    mapper.myDataFrame(y1,y2,y3,y4).to_sql('mapping_table',mapping_db)
+except:
+    print('File already exists')
+
